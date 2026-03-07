@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EyeGuard Camera Management</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .subtitle {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        border-bottom: 2px solid #eee;
+      }
+
+      .tab-button {
+        padding: 10px 20px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: #999;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s;
+      }
+
+      .tab-button.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+      }
+
+      .tab-button:hover {
+        color: #667eea;
+      }
+
+      .tab-content {
+        display: none;
+        margin-top: 20px;
+        animation: fadeIn 0.3s;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .card {
+        background: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.3s;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .form-row.full {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+        margin-left: 10px;
+      }
+
+      .btn-secondary:hover {
+        background: #e0e0e0;
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .message {
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .message.show {
+        display: block;
+      }
+
+      .message.success {
+        background: #dcfce7;
+        border-left: 4px solid #10b981;
+        color: #166534;
+      }
+
+      .message.error {
+        background: #fee;
+        border-left: 4px solid #c53030;
+        color: #742a2a;
+      }
+
+      .message.info {
+        background: #dbeafe;
+        border-left: 4px solid #3b82f6;
+        color: #1e40af;
+      }
+
+      .camera-list {
+        display: grid;
+        gap: 15px;
+      }
+
+      .camera-item {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .camera-info h3 {
+        color: #333;
+        margin-bottom: 5px;
+        font-size: 16px;
+      }
+
+      .camera-info p {
+        color: #666;
+        font-size: 13px;
+        margin: 2px 0;
+      }
+
+      .camera-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-top: 8px;
+      }
+
+      .status-active {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status-inactive {
+        background: #fee;
+        color: #c53030;
+      }
+
+      .camera-actions button {
+        margin-left: 5px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+      }
+
+      .help-text {
+        font-size: 12px;
+        color: #999;
+        margin-top: 5px;
+      }
+
+      .alert {
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+
+      .alert-info {
+        background: #dbeafe;
+        border-left: 4px solid #3b82f6;
+        color: #1e40af;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loader-text {
+        display: flex;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📹 EyeGuard Camera Management</h1>
+        <p class="subtitle">
+          Setup and manage IP cameras from Hikvision and other manufacturers
+        </p>
+
+        <div class="tabs">
+          <button class="tab-button active" onclick="switchTab('setup')">
+            Setup New Camera
+          </button>
+          <button class="tab-button" onclick="switchTab('cameras')">
+            My Cameras
+          </button>
+        </div>
+      </div>
+
+      <!-- Setup Tab -->
+      <div id="setup-tab" class="tab-content active">
+        <div class="card">
+          <h2 style="margin-bottom: 20px; color: #333">Add Hikvision Camera</h2>
+
+          <div id="setupMessage" class="message"></div>
+
+          <div class="alert alert-info">
+            <strong>ℹ️ Hikvision Setup:</strong> For Hikvision cameras, enter
+            the camera's IP address and admin credentials. The system will
+            automatically detect and decode the stream.
+          </div>
+
+          <form id="cameraForm" onsubmit="handleCameraSetup(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cameraName">Camera Name *</label>
+                <input
+                  type="text"
+                  id="cameraName"
+                  placeholder="e.g., Main Entrance"
+                  required
+                />
+                <div class="help-text">A friendly name for this camera</div>
+              </div>
+
+              <div class="form-group">
+                <label for="location">Location *</label>
+                <input
+                  type="text"
+                  id="location"
+                  placeholder="e.g., Entrance, Parking Lot"
+                  required
+                />
+                <div class="help-text">Physical location of the camera</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="ipAddress">Camera IP Address *</label>
+                <input
+                  type="text"
+                  id="ipAddress"
+                  placeholder="e.g., 192.168.1.100"
+                  required
+                />
+                <div class="help-text">
+                  IP address or hostname of the camera
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="streamPort">Stream Port (Optional)</label>
+                <input
+                  type="number"
+                  id="streamPort"
+                  placeholder="Default: 554"
+                  value="554"
+                />
+                <div class="help-text">RTSP port (default: 554)</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="username">Username *</label>
+                <input
+                  type="text"
+                  id="username"
+                  placeholder="e.g., admin"
+                  required
+                />
+                <div class="help-text">Camera admin username</div>
+              </div>
+
+              <div class="form-group">
+                <label for="password">Password *</label>
+                <div
+                  style="position: relative; display: flex; align-items: center"
+                >
+                  <input
+                    type="password"
+                    id="password"
+                    placeholder="Camera password"
+                    required
+                    style="flex: 1; padding-right: 40px"
+                  />
+                  <button
+                    type="button"
+                    id="togglePassword"
+                    style="
+                      position: absolute;
+                      right: 10px;
+                      background: none;
+                      border: none;
+                      cursor: pointer;
+                      font-size: 18px;
+                      padding: 0;
+                    "
+                    onclick="togglePasswordVisibility()"
+                  >
+                    👁️
+                  </button>
+                </div>
+                <div class="help-text">Camera admin password</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="businessId">Business/Organization *</label>
+                <select id="businessId" required>
+                  <option value="">Select an organization...</option>
+                </select>
+                <div class="help-text">
+                  Select the business this camera belongs to
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="cameraChannel">Channel (Optional)</label>
+                <input
+                  type="number"
+                  id="cameraChannel"
+                  placeholder="Default: 1"
+                  value="1"
+                  min="1"
+                  max="8"
+                />
+                <div class="help-text">
+                  Channel number for multi-channel devices
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row full">
+              <div class="form-group">
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 10px;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="testConnection"
+                    style="width: auto; margin-right: 8px"
+                  />
+                  Test connection before saving
+                </label>
+                <div class="help-text">
+                  Verify the camera is accessible and credentials are correct
+                </div>
+              </div>
+            </div>
+
+            <div class="button-group">
+              <button type="submit" class="btn-primary" id="submitBtn">
+                Add Camera
+              </button>
+              <button type="reset" class="btn-secondary">Clear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Cameras Tab -->
+      <div id="cameras-tab" class="tab-content">
+        <div class="card">
+          <h2 style="margin-bottom: 20px; color: #333">Connected Cameras</h2>
+
+          <div id="camerasMessage" class="message"></div>
+
+          <div id="camerasList" class="camera-list">
+            <div class="empty-state">
+              <div class="empty-state-icon">📹</div>
+              <p>No cameras configured yet</p>
+              <p style="font-size: 12px; margin-top: 10px">
+                Go to Setup to add your first camera
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let businesses = [];
+      let cameras = [];
+
+      // Get CSRF token from cookie
+      function getCsrfToken() {
+        const name = "csrftoken";
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+          const cookies = document.cookie.split(";");
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === name + "=") {
+              cookieValue = decodeURIComponent(
+                cookie.substring(name.length + 1),
+              );
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      function togglePasswordVisibility() {
+        const passwordInput = document.getElementById("password");
+        const toggleBtn = document.getElementById("togglePassword");
+
+        if (passwordInput.type === "password") {
+          passwordInput.type = "text";
+          toggleBtn.textContent = "🙈";
+        } else {
+          passwordInput.type = "password";
+          toggleBtn.textContent = "👁️";
+        }
+      }
+
+      // Initialize on page load - uses Django session authentication
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("Page loaded, calling loadBusinesses and loadCameras");
+        loadBusinesses();
+        loadCameras();
+      });
+
+      function switchTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll(".tab-content").forEach((tab) => {
+          tab.classList.remove("active");
+        });
+        document.querySelectorAll(".tab-button").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+
+        // Show selected tab
+        document.getElementById(tabName + "-tab").classList.add("active");
+        event.target.classList.add("active");
+      }
+
+      async function loadBusinesses() {
+        try {
+          console.log("Fetching businesses...");
+          const response = await fetch("/api/businesses/", {
+            credentials: "include",
+          });
+          console.log("Response status:", response.status);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("API error:", errorData);
+            throw new Error(errorData.detail || "Failed to load businesses");
+          }
+
+          businesses = await response.json();
+          console.log("Businesses loaded:", businesses);
+          // Handle both paginated and direct array responses
+          if (Array.isArray(businesses)) {
+            // Direct array response
+          } else if (businesses.results) {
+            // Paginated response - extract results
+            businesses = businesses.results;
+          }
+          populateBusinessSelect();
+        } catch (error) {
+          showMessage(
+            "setupMessage",
+            `Error loading businesses: ${error.message}`,
+            "error",
+          );
+        }
+      }
+
+      function populateBusinessSelect() {
+        const select = document.getElementById("businessId");
+        const currentValue = select.value;
+
+        select.innerHTML =
+          '<option value="">Select an organization...</option>';
+        businesses.forEach((business) => {
+          const option = document.createElement("option");
+          option.value = business.id;
+          option.textContent = business.name;
+          select.appendChild(option);
+        });
+
+        if (currentValue) select.value = currentValue;
+      }
+
+      async function handleCameraSetup(event) {
+        event.preventDefault();
+
+        const cameraName = document.getElementById("cameraName").value;
+        const location = document.getElementById("location").value;
+        const ipAddress = document.getElementById("ipAddress").value;
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const businessId = document.getElementById("businessId").value;
+        const channel =
+          parseInt(document.getElementById("cameraChannel").value) || 1;
+        const testConnection =
+          document.getElementById("testConnection").checked;
+
+        if (!businessId) {
+          showMessage("setupMessage", "Please select an organization", "error");
+          return;
+        }
+
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML =
+          '<span class="loader-text"><span class="spinner"></span>Adding camera...</span>';
+
+        try {
+          const response = await fetch("/api/cameras/setup_hikvision/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCsrfToken(),
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              name: cameraName,
+              location: location,
+              ip_address: ipAddress,
+              username: username,
+              password: password,
+              business_id: parseInt(businessId),
+              channel: channel,
+              test_connection: testConnection,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to add camera");
+          }
+
+          showMessage(
+            "setupMessage",
+            `✅ Camera "${cameraName}" added successfully!`,
+            "success",
+          );
+          document.getElementById("cameraForm").reset();
+          setTimeout(() => {
+            loadCameras();
+            switchTab("cameras");
+          }, 1500);
+        } catch (error) {
+          showMessage("setupMessage", `❌ ${error.message}`, "error");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = "Add Camera";
+        }
+      }
+
+      async function loadCameras() {
+        try {
+          console.log("Fetching cameras...");
+          const response = await fetch("/api/cameras/", {
+            credentials: "include",
+          });
+          console.log("Cameras response status:", response.status);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Cameras API error:", errorData);
+            throw new Error("Failed to load cameras");
+          }
+
+          cameras = await response.json();
+          console.log("Cameras loaded:", cameras);
+          // Handle both paginated and direct array responses
+          if (Array.isArray(cameras)) {
+            // Direct array response
+          } else if (cameras.results) {
+            // Paginated response - extract results
+            cameras = cameras.results;
+          }
+          renderCameras();
+        } catch (error) {
+          showMessage(
+            "camerasMessage",
+            `Error loading cameras: ${error.message}`,
+            "error",
+          );
+        }
+      }
+
+      function renderCameras() {
+        const container = document.getElementById("camerasList");
+
+        if (cameras.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📹</div>
+              <p>No cameras configured yet</p>
+              <p style="font-size: 12px; margin-top: 10px">Go to Setup to add your first camera</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = cameras
+          .map(
+            (camera) => `
+          <div class="camera-item">
+            <div class="camera-info">
+              <h3>${camera.name}</h3>
+              <p><strong>Location:</strong> ${camera.location}</p>
+              <p><strong>Type:</strong> ${camera.camera_type_display || "Generic IP Camera"}</p>
+              <p><strong>IP Address:</strong> ${camera.stream_url}</p>
+              <p><strong>Stream Type:</strong> ${camera.stream_type_display}</p>
+              <div class="camera-status ${camera.is_active ? "status-active" : "status-inactive"}">
+                ${camera.status_display}
+              </div>
+            </div>
+            <div class="camera-actions">
+              <button class="btn-secondary" onclick="editCamera(${camera.id})">Edit</button>
+              <button class="btn-danger" onclick="deleteCamera(${camera.id})">Delete</button>
+            </div>
+          </div>
+        `,
+          )
+          .join("");
+      }
+
+      function editCamera(cameraId) {
+        alert("Edit functionality coming soon!");
+      }
+
+      async function deleteCamera(cameraId) {
+        if (!confirm("Are you sure you want to delete this camera?")) return;
+
+        try {
+          const response = await fetch(`/api/cameras/${cameraId}/`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+
+          if (!response.ok) throw new Error("Failed to delete camera");
+
+          showMessage(
+            "camerasMessage",
+            "✅ Camera deleted successfully",
+            "success",
+          );
+          loadCameras();
+        } catch (error) {
+          showMessage("camerasMessage", `❌ ${error.message}`, "error");
+        }
+      }
+
+      function showMessage(elementId, message, type) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = message;
+        element.className = `message show ${type}`;
+        if (type !== "error") {
+          setTimeout(() => {
+            element.classList.remove("show");
+          }, 5000);
+        }
+      }
+    </script>
+  </body>
+</html>

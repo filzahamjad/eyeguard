@@ -1,0 +1,21 @@
+# Build outputs — never commit these (they are OS-specific and huge)
+dist/
+build/
+*.spec.bak
+
+# Model weights — large binary files, distribute separately
+media/models/
+media/models/*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+
+# macOS
+.DS_Store

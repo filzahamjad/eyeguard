@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EyeGuard Live Detection</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 1rem; background: #1a1a1a; color: #e0e0e0; }
+    h1 { margin-top: 0; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; margin: 1rem 0; }
+    #video { display: block; width: 100%; max-height: 70vh; }
+    #overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+    #annotated { display: block; width: 100%; max-height: 70vh; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+    button { padding: 0.5rem 1rem; cursor: pointer; border: none; border-radius: 6px; font-size: 1rem; }
+    button.primary { background: #2563eb; color: white; }
+    button.primary:hover { background: #1d4ed8; }
+    button.secondary { background: #374151; color: white; }
+    button.secondary:hover { background: #4b5563; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .stats { margin: 0.5rem 0; font-size: 0.9rem; color: #9ca3af; }
+    .status { padding: 0.5rem; border-radius: 6px; margin: 0.5rem 0; }
+    .status.connected { background: #065f46; color: #a7f3d0; }
+    .status.disconnected { background: #444; color: #9ca3af; }
+    .status.error { background: #7f1d1d; color: #fecaca; }
+    label { margin-right: 0.5rem; }
+    input[type="number"] { width: 80px; padding: 0.25rem; }
+    .detections { margin-top: 1rem; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Live Webcam Detection</h1>
+    <p>Allow camera access, then start to run detection on your webcam feed. Requires login.</p>
+
+    <div class="controls">
+      <button id="btnStart" class="primary">Start camera</button>
+      <button id="btnStop" class="secondary" disabled>Stop</button>
+      <label>Camera ID (optional):</label>
+      <input type="number" id="cameraId" placeholder="e.g. 1" min="1" />
+      <label>Interval (ms):</label>
+      <input type="number" id="interval" value="300" min="200" max="2000" step="100" />
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+    <div class="stats" id="stats"></div>
+
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <img id="annotated" alt="Annotated output" style="display:none;" />
+    </div>
+
+    <div class="detections" id="detections"></div>
+  </div>
+
+  <script>
+    (function() {
+      const video = document.getElementById('video');
+      const overlay = document.getElementById('overlay');
+      const annotatedImg = document.getElementById('annotated');
+      const btnStart = document.getElementById('btnStart');
+      const btnStop = document.getElementById('btnStop');
+      const cameraIdInput = document.getElementById('cameraId');
+      const intervalInput = document.getElementById('interval');
+      const statusEl = document.getElementById('status');
+      const statsEl = document.getElementById('stats');
+      const detectionsEl = document.getElementById('detections');
+
+      let stream = null;
+      let ws = null;
+      let modelsReady = false;
+      let timerId = null;
+      let lastDetections = [];
+      let frameCount = 0;
+      let lastFpsUpdate = 0;
+      let fpsFrames = 0;
+
+      function setStatus(msg, className) {
+        statusEl.textContent = msg;
+        statusEl.className = 'status ' + (className || 'disconnected');
+      }
+
+      function setStats(text) {
+        statsEl.textContent = text;
+      }
+
+      function drawDetectionsOnOverlay(detections) {
+        if (!detections || !detections.length) return;
+        const ctx = overlay.getContext('2d');
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        overlay.width = vw;
+        overlay.height = vh;
+        ctx.clearRect(0, 0, vw, vh);
+        const scaleX = overlay.offsetWidth / vw;
+        const scaleY = overlay.offsetHeight / vh;
+        detections.forEach(function(d) {
+          const bbox = d.bbox || [];
+          if (bbox.length !== 4) return;
+          const [x1, y1, x2, y2] = bbox;
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
+          ctx.fillStyle = '#00ff00';
+          ctx.font = '14px sans-serif';
+          ctx.fillText((d.label || d.type) + ' ' + (d.confidence ? (d.confidence * 100).toFixed(0) + '%' : ''), x1 * scaleX, Math.max(20, y1 * scaleY - 5));
+        });
+      }
+
+      function showAnnotatedImage(b64) {
+        if (!b64) return;
+        annotatedImg.src = 'data:image/jpeg;base64,' + b64;
+        annotatedImg.style.display = 'block';
+        video.style.display = 'none';
+        overlay.style.display = 'none';
+        setTimeout(function() {
+          annotatedImg.style.display = 'none';
+          video.style.display = 'block';
+          overlay.style.display = 'block';
+        }, 100);
+      }
+
+      function captureAndSend() {
+        if (!stream || !video.videoWidth || !ws || ws.readyState !== WebSocket.OPEN) return;
+        if (!modelsReady && !cameraIdInput.value) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        canvas.toBlob(function(blob) {
+          if (ws && ws.readyState === WebSocket.OPEN)
+            ws.send(blob);
+        }, 'image/jpeg', 0.85);
+
+        frameCount++;
+        fpsFrames++;
+        const now = Date.now() / 1000;
+        if (now - lastFpsUpdate >= 1) {
+          setStats('FPS: ' + fpsFrames + ' | Frames sent: ' + frameCount);
+          lastFpsUpdate = now;
+          fpsFrames = 0;
+        }
+      }
+
+      function connect() {
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const path = cameraIdInput.value
+          ? '/ws/live-detection/' + cameraIdInput.value + '/'
+          : '/ws/live-detection/';
+        const url = scheme + '//' + location.host + path;
+        ws = new WebSocket(url);
+
+        ws.onopen = function() {
+          setStatus('WebSocket connected. ' + (cameraIdInput.value ? 'Using camera ' + cameraIdInput.value : 'Send model config if needed.'), 'connected');
+          if (!cameraIdInput.value) {
+            ws.send(JSON.stringify({ model_ids: null }));
+          } else {
+            modelsReady = true;
+          }
+        };
+
+        ws.onmessage = function(ev) {
+          try {
+            const data = JSON.parse(ev.data);
+            if (data.type === 'connection_established') {
+              if (data.models_loaded) modelsReady = true;
+            } else if (data.type === 'ready') {
+              modelsReady = true;
+              setStatus('Models loaded. Sending frames.', 'connected');
+            } else if (data.type === 'detection') {
+              lastDetections = data.detections || [];
+              drawDetectionsOnOverlay(lastDetections);
+              if (data.annotated_image_b64)
+                showAnnotatedImage(data.annotated_image_b64);
+              detectionsEl.textContent = lastDetections.length
+                ? 'Detections: ' + lastDetections.map(function(d) { return d.label + ' ' + (d.confidence ? (d.confidence * 100).toFixed(0) + '%' : ''); }).join(', ')
+                : 'No detections';
+            } else if (data.type === 'error') {
+              setStatus('Error: ' + (data.message || 'Unknown'), 'error');
+            }
+          } catch (e) {}
+        };
+
+        ws.onclose = function() {
+          setStatus('Disconnected', 'disconnected');
+          modelsReady = false;
+        };
+
+        ws.onerror = function() {
+          setStatus('WebSocket error', 'error');
+        };
+      }
+
+      btnStart.onclick = function() {
+        btnStart.disabled = true;
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          .then(function(s) {
+            stream = s;
+            video.srcObject = stream;
+            btnStop.disabled = false;
+            connect();
+            const interval = parseInt(intervalInput.value, 10) || 300;
+            timerId = setInterval(captureAndSend, interval);
+            setStatus('Camera on. Connecting…', 'disconnected');
+          })
+          .catch(function(err) {
+            setStatus('Camera error: ' + err.message, 'error');
+            btnStart.disabled = false;
+          });
+      };
+
+      btnStop.onclick = function() {
+        if (timerId) { clearInterval(timerId); timerId = null; }
+        if (ws) { ws.close(); ws = null; }
+        if (stream) {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          stream = null;
+        }
+        video.srcObject = null;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        setStatus('Stopped', 'disconnected');
+        setStats('');
+        detectionsEl.textContent = '';
+      };
+    })();
+  </script>
+</body>
+</html>

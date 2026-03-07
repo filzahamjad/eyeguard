@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EyeGuard Alert Stream</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #999;
+        animation: pulse 2s infinite;
+      }
+
+      .status-indicator.connected {
+        background: #10b981;
+        animation: pulse-green 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      @keyframes pulse-green {
+        0%,
+        100% {
+          opacity: 1;
+          box-shadow: 0 0 10px #10b981;
+        }
+        50% {
+          opacity: 0.8;
+        }
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+      }
+
+      input,
+      button {
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+
+      input {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: #5568d3;
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .alerts-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+      }
+
+      .alert {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .alert:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .alert-header {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+      }
+
+      .alert-type {
+        font-weight: 700;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .alert-severity {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .severity-critical {
+        background: #fee;
+        color: #c53030;
+      }
+      .severity-high {
+        background: #fef3c7;
+        color: #d97706;
+      }
+      .severity-medium {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .severity-low {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .alert-body {
+        padding: 15px;
+      }
+
+      .alert-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 10px;
+      }
+
+      .alert-info strong {
+        color: #333;
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+
+      .confidence-bar {
+        height: 4px;
+        background: #eee;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 5px;
+      }
+
+      .confidence-fill {
+        height: 100%;
+        background: #10b981;
+        border-radius: 2px;
+      }
+
+      .detected-objects {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+        font-size: 12px;
+      }
+
+      .object {
+        padding: 5px 0;
+        color: #666;
+      }
+
+      .object strong {
+        color: #333;
+        margin-right: 5px;
+      }
+
+      .timestamp {
+        font-size: 11px;
+        color: #999;
+        margin-top: 10px;
+      }
+
+      .stats {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat {
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #667eea;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 5px;
+      }
+
+      .error {
+        background: #fee;
+        border-left: 4px solid #c53030;
+        padding: 15px;
+        border-radius: 5px;
+        color: #742a2a;
+        margin-top: 10px;
+      }
+
+      .success {
+        background: #dcfce7;
+        border-left: 4px solid #10b981;
+        padding: 15px;
+        border-radius: 5px;
+        color: #166534;
+        margin-top: 10px;
+      }
+
+      .empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🚨 EyeGuard Real-Time Alert Stream</h1>
+        <div class="status">
+          <div class="status-indicator" id="statusIndicator"></div>
+          <span id="statusText">Disconnected</span>
+        </div>
+
+        <div class="controls">
+          <input
+            type="text"
+            id="tokenInput"
+            placeholder="Enter your API token (or paste and click Connect)"
+            value="YOUR_TOKEN_HERE"
+          />
+          <button id="connectBtn" onclick="toggleConnection()">Connect</button>
+          <button id="clearBtn" onclick="clearAlerts()">Clear Alerts</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="totalAlerts">0</div>
+          <div class="stat-label">Total Alerts</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="criticalCount">0</div>
+          <div class="stat-label">Critical</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="highCount">0</div>
+          <div class="stat-label">High</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="connectedTime">0s</div>
+          <div class="stat-label">Connected</div>
+        </div>
+      </div>
+
+      <div id="message"></div>
+      <div class="alerts-container" id="alertsContainer">
+        <div class="empty">
+          No alerts yet. Connect to start receiving alerts.
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let ws = null;
+      let alerts = [];
+      let connectedTime = 0;
+      let connectedInterval = null;
+
+      function toggleConnection() {
+        const token = document.getElementById("tokenInput").value.trim();
+        if (!token || token === "YOUR_TOKEN_HERE") {
+          showMessage("❌ Please enter a valid token", "error");
+          return;
+        }
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          disconnectWebSocket();
+        } else {
+          connectWebSocket(token);
+        }
+      }
+
+      function connectWebSocket(token) {
+        const cameraId = 1; // Change as needed
+        const wsUrl = `ws://localhost:8000/ws/alerts/camera/${cameraId}/?token=${token}`;
+
+        try {
+          ws = new WebSocket(wsUrl);
+
+          ws.onopen = () => {
+            updateStatus("Connected", true);
+            showMessage("✅ Connected to alert stream", "success");
+            startConnectedTimer();
+            document.getElementById("connectBtn").textContent = "Disconnect";
+          };
+
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleMessage(data);
+          };
+
+          ws.onerror = (event) => {
+            updateStatus("Connection Error", false);
+            showMessage("❌ WebSocket connection error", "error");
+            console.error("WebSocket error:", event);
+          };
+
+          ws.onclose = () => {
+            updateStatus("Disconnected", false);
+            stopConnectedTimer();
+            document.getElementById("connectBtn").textContent = "Connect";
+          };
+
+          // Keep connection alive
+          setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "ping" }));
+            }
+          }, 30000);
+        } catch (error) {
+          updateStatus("Connection Failed", false);
+          showMessage(`❌ ${error.message}`, "error");
+          console.error("WebSocket error:", error);
+        }
+      }
+
+      function disconnectWebSocket() {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        updateStatus("Disconnected", false);
+        stopConnectedTimer();
+      }
+
+      function handleMessage(data) {
+        if (data.type === "connection_established") {
+          console.log("✅", data.message);
+        } else if (data.type === "alert_created") {
+          addAlert(data.alert);
+        } else if (data.type === "alert_updated") {
+          updateAlert(data.alert);
+        } else if (data.type === "pong") {
+          // Keep-alive response, ignore
+        }
+      }
+
+      function addAlert(alertData) {
+        alerts.unshift(alertData);
+        renderAlerts();
+        updateStats();
+
+        // Play notification sound (optional)
+        playNotificationSound();
+      }
+
+      function updateAlert(alertData) {
+        const index = alerts.findIndex((a) => a.id === alertData.id);
+        if (index !== -1) {
+          alerts[index] = { ...alerts[index], ...alertData };
+          renderAlerts();
+        }
+      }
+
+      function renderAlerts() {
+        const container = document.getElementById("alertsContainer");
+
+        if (alerts.length === 0) {
+          container.innerHTML = '<div class="empty">No alerts yet.</div>';
+          return;
+        }
+
+        container.innerHTML = alerts
+          .map(
+            (alert) => `
+                <div class="alert">
+                    <div class="alert-header">
+                        <div class="alert-type">${alert.alert_type}</div>
+                        <div class="alert-severity severity-${alert.severity}">${alert.severity}</div>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-info">
+                            <div>
+                                <strong>Confidence</strong>
+                                ${(alert.confidence_score * 100).toFixed(1)}%
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${alert.confidence_score * 100}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <strong>Status</strong>
+                                ${alert.status}
+                            </div>
+                            <div>
+                                <strong>Camera</strong>
+                                ${alert.camera}
+                            </div>
+                            <div>
+                                <strong>ID</strong>
+                                #${alert.id}
+                            </div>
+                        </div>
+
+                        ${
+                          alert.objects && alert.detected_objects.length > 0
+                            ? `
+                            <div class="detected-objects">
+                                <strong>Detected Objects:</strong>
+                                ${alert.detected_objects
+                                  .map(
+                                    (obj) => `
+                                    <div class="object">
+                                        <strong>${obj.label}:</strong> ${(obj.confidence * 100).toFixed(1)}%
+                                    </div>
+                                `,
+                                  )
+                                  .join("")}
+                            </div>
+                        `
+                            : ""
+                        }
+
+                        <div class="timestamp">
+                            Created: ${new Date(alert.created_at).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `,
+          )
+          .join("");
+      }
+
+      function updateStats() {
+        document.getElementById("totalAlerts").textContent = alerts.length;
+        const critical = alerts.filter((a) => a.severity === "critical").length;
+        const high = alerts.filter((a) => a.severity === "high").length;
+        document.getElementById("criticalCount").textContent = critical;
+        document.getElementById("highCount").textContent = high;
+      }
+
+      function updateStatus(text, isConnected) {
+        document.getElementById("statusText").textContent = text;
+        const indicator = document.getElementById("statusIndicator");
+        if (isConnected) {
+          indicator.classList.add("connected");
+        } else {
+          indicator.classList.remove("connected");
+        }
+      }
+
+      function startConnectedTimer() {
+        connectedTime = 0;
+        connectedInterval = setInterval(() => {
+          connectedTime++;
+          const hours = Math.floor(connectedTime / 3600);
+          const minutes = Math.floor((connectedTime % 3600) / 60);
+          const seconds = connectedTime % 60;
+
+          let timeStr;
+          if (hours > 0) {
+            timeStr = `${hours}h ${minutes}m`;
+          } else if (minutes > 0) {
+            timeStr = `${minutes}m ${seconds}s`;
+          } else {
+            timeStr = `${seconds}s`;
+          }
+
+          document.getElementById("connectedTime").textContent = timeStr;
+        }, 1000);
+      }
+
+      function stopConnectedTimer() {
+        if (connectedInterval) {
+          clearInterval(connectedInterval);
+          connectedInterval = null;
+        }
+        document.getElementById("connectedTime").textContent = "0s";
+      }
+
+      function showMessage(message, type) {
+        const container = document.getElementById("message");
+        container.innerHTML = `<div class="${type}">${message}</div>`;
+        setTimeout(() => {
+          container.innerHTML = "";
+        }, 5000);
+      }
+
+      function clearAlerts() {
+        alerts = [];
+        renderAlerts();
+        updateStats();
+      }
+
+      function playNotificationSound() {
+        // Simple beep using Web Audio API
+        try {
+          const audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 800;
+          oscillator.type = "sine";
+
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioContext.currentTime + 0.1,
+          );
+
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+          // Audio context not available, ignore
+        }
+      }
+
+      // Initialize
+      updateStatus("Disconnected", false);
+    </script>
+  </body>
+</html>

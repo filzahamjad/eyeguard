@@ -1,0 +1,45 @@
+Django==5.2.11
+djangorestframework
+django-filter
+psycopg2-binary
+
+# Optional (dev):
+# black
+# ruff# Django and REST Framework
+Django
+djangorestframework
+django-filter==23.3
+django-cors-headers>=4.3.1  # 4.3.1+ required for ASGI/Daphne compatibility
+
+# Database (choose one)
+psycopg2-binary  # PostgreSQL (recommended for production)
+# mysqlclient==2.2.0     # MySQL
+# For SQLite, no additional package needed (default)
+
+# Computer Vision and AI
+# numpy<2 is required: torch 2.2.x was compiled against NumPy 1.x and crashes with NumPy 2.x
+numpy<2
+opencv-python
+torch  # Compatible with ultralytics 8.0.207
+torchvision
+ultralytics>=8.2.0    # 8.2+ required for YOLO11 / C3k2 (e.g. yolo11n.pt motion model)
+
+# Image Processing
+Pillow
+
+# Utilities
+python-dotenv==1.0.0
+pytz==2023.3
+
+# Static files under ASGI (Daphne doesn't serve them; WhiteNoise does)
+whitenoise>=6.6.0
+
+# WebSockets and Async
+channels==4.0.0        # Django WebSocket support
+channels-redis==4.1.0  # Redis backend for channels
+daphne==4.0.0         # ASGI server for Django (replaces runserver for WebSockets)
+
+# Optional but recommended
+gunicorn==21.2.0  # Production WSGI server
+celery==5.3.4     # For async task processing
+redis==5.0.1      # Task queue backend
