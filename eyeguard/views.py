@@ -18,8 +18,14 @@ import os
 import cv2
 import numpy as np
 import concurrent.futures
+import threading
+from django.http import StreamingHttpResponse
 from django.core.files.base import ContentFile
 from django.utils import timezone
+
+# Registry of actively running VideoProcessor instances, keyed by camera id.
+# Used by start_processing / stop_processing / processing_status view actions.
+_active_processors: dict = {}
 
 from .models import (
     Subscription, Business, DetectionModel, Camera,
@@ -641,6 +647,126 @@ class CameraViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['post'])
+    def start_processing(self, request, pk=None):
+        """Start process_camera for this camera in a background thread.
+
+        Equivalent to: python manage.py process_camera <camera_id>
+
+        POST body (optional):
+          - max_frames: int  limit processing to N frames (default: unlimited)
+        """
+        camera = self.get_object()
+        cid = camera.id
+        max_frames = request.data.get('max_frames', None)
+
+        # Already running?
+        entry = _active_processors.get(cid)
+        if entry and entry['thread'].is_alive():
+            return Response({'status': 'already_running', 'camera_id': cid})
+
+        from .video_processor import VideoProcessor
+
+        processor = VideoProcessor(cid)
+
+        def _run():
+            try:
+                processor.run(max_frames=max_frames)
+            except Exception as exc:
+                print(f"[camera {cid}] processing error: {exc}")
+            finally:
+                _active_processors.pop(cid, None)
+
+        t = threading.Thread(target=_run, daemon=True, name=f'cam-proc-{cid}')
+        _active_processors[cid] = {'thread': t, 'processor': processor}
+        t.start()
+
+        return Response({'status': 'started', 'camera_id': cid})
+
+    @action(detail=True, methods=['post'])
+    def stop_processing(self, request, pk=None):
+        """Gracefully stop a running process_camera background thread."""
+        camera = self.get_object()
+        cid = camera.id
+
+        entry = _active_processors.get(cid)
+        if not entry or not entry['thread'].is_alive():
+            return Response({'status': 'not_running', 'camera_id': cid})
+
+        entry['processor'].stop_event.set()
+        return Response({'status': 'stop_requested', 'camera_id': cid})
+
+    @action(detail=True, methods=['get'])
+    def processing_status(self, request, pk=None):
+        """Return whether process_camera is currently running for this camera."""
+        camera = self.get_object()
+        cid = camera.id
+        entry = _active_processors.get(cid)
+        running = bool(entry and entry['thread'].is_alive())
+        return Response({'camera_id': cid, 'running': running})
+
+    @action(detail=True, methods=['get'])
+    def stream(self, request, pk=None):
+        """Live MJPEG stream from the camera feed.
+
+        Opens the camera's configured stream URL with OpenCV and returns a
+        multipart/x-mixed-replace HTTP response so any browser <img> tag can
+        display it in real time.
+
+        Usage in a browser or <img src="...">:
+          GET /api/cameras/{id}/stream/
+          (must be authenticated via session login)
+        """
+        camera = self.get_object()
+
+        # Build the actual stream URL (same logic as VideoProcessor)
+        from .video_processor import build_hikvision_rtsp_url
+
+        stream_url = camera.stream_url
+        if camera.camera_type == 'hikvision' and camera.username and camera.password:
+            try:
+                stream_url = build_hikvision_rtsp_url(
+                    ip_address=camera.stream_url,
+                    username=camera.username,
+                    password=camera.password,
+                    channel=camera.channel,
+                )
+            except Exception as exc:
+                return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        def _frame_generator():
+            if camera.stream_type == 'webcam':
+                idx = int(stream_url) if str(stream_url).isdigit() else 0
+                cap = cv2.VideoCapture(idx)
+            else:
+                cap = cv2.VideoCapture(stream_url)
+
+            if not cap.isOpened():
+                return
+
+            try:
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    ok, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    if not ok:
+                        continue
+                    yield (
+                        b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\n\r\n'
+                        + buffer.tobytes()
+                        + b'\r\n'
+                    )
+            finally:
+                cap.release()
+
+        response = StreamingHttpResponse(
+            _frame_generator(),
+            content_type='multipart/x-mixed-replace; boundary=frame',
+        )
+        return response
+
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Update camera status"""

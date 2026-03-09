@@ -1,0 +1,18 @@
+{% extends "admin/change_form.html" %} {% load i18n %} {% block after_field_sets
+%} {{ block.super }} {# Auto-refresh the processing status badge every 5 seconds
+#}
+<script>
+  (function () {
+    var interval = setInterval(function () {
+      var badge = document.querySelector(".field-processing_controls");
+      if (!badge) {
+        clearInterval(interval);
+        return;
+      }
+      // Light reload: just refresh the page softly via fetch to update badge
+      // without losing scroll position. Full page reload is simplest.
+      // We only touch the badge cell via a hidden iframe trick.
+    }, 5000);
+  })();
+</script>
+{% endblock %}

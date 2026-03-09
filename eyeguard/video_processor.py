@@ -117,6 +117,8 @@ class VideoProcessor:
         self.processing_log = None
         # Buffer of previous frames (raw BGR arrays). Keep last 40 frames
         self.prev_frames = deque(maxlen=40)
+        # Stop event: set this to request graceful shutdown of run()
+        self.stop_event = threading.Event()
         # Index for writing circular previous-frame files (0..maxlen-1)
         self.prev_write_index = 0
         
@@ -554,6 +556,10 @@ class VideoProcessor:
             self.start_processing_log()
             
             while True:
+                if self.stop_event.is_set():
+                    print("Stop requested — exiting processing loop")
+                    break
+
                 ret, frame = self.cap.read()
                 if not ret:
                     print("End of video stream")
