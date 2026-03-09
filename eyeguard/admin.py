@@ -76,7 +76,6 @@ class CameraAdmin(admin.ModelAdmin):
     ordering = ['-created_at']
     inlines = [CameraDetectionModelInline]
     change_list_template = "admin/eyeguard/camera/change_list.html"
-    change_form_template = "admin/eyeguard/camera/change_form.html"
 
     def get_urls(self):
         urls = super().get_urls()
