@@ -448,33 +448,3 @@ def process_camera_async(camera_id):
 4. **File Upload**: Validate and sanitize all file uploads
 5. **CORS**: Configure CORS properly for your frontend domain
 6. **Secrets**: Use environment variables for sensitive data
-
-## Troubleshooting
-
-### Camera Stream Won't Open
-
-- Verify stream URL is correct
-- Check network connectivity
-- Ensure camera supports the protocol (RTSP/HTTP)
-- Test with VLC media player first
-
-### Models Not Loading
-
-- Check model file paths in database
-- Ensure model files exist in `media/models/`
-- Verify file permissions
-
-### Low Performance
-
-- Reduce `target_fps` in camera settings
-- Use GPU acceleration (CUDA)
-- Optimize model confidence thresholds
-- Process fewer cameras simultaneously
-
-## License
-
-[Your License Here]
-
-## Support
-
-For issues and questions, please open an issue on GitHub or contact support.
